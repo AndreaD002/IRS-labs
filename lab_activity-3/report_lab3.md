@@ -1,0 +1,18 @@
+# Lab 3 Report 
+## Andrea Dotti
+## Subsumption Architecture Controller
+This controller is built on the subsumption architecture where the core idea is to decompose behaviors into independent layers, each one a complete behavior on its own, ordered by priority. Instead of a central planner deciding what to do, layers are stacked so that higher-priority ones can simply override the output of lower ones when their condition is active. The behavior that emerges is the result of this competition and it keeps the design **modular**, readable, and easy to extend.
+
+All sensor reading is centralized in a dedicated *sense()* function that runs at the start of every step and returns a single structured table used by all layers. It reads the maximum proximity value on each side, the maximum light intensity on each half of the robot, and the minimum ground reflectance across all four ground sensors. The reactive logic of each layer is still grounded in the **Braitenberg** idea, where sensors connect directly to motor outputs with no intermediate planning, while the subsumption architecture adds the priority mechanism on top, deciding which reaction gets to act at any given moment.
+
+The four behaviors implemented here are wandering, phototaxis, obstacle avoidance with escape, and halting on a black spot, each mapped to a dedicated layer in increasing priority order.
+
+**Wandering** sits at the bottom as the default layer. When nothing else is active, the robot moves straight forward at full speed. In a closed environment, straight motion covers ground efficiently without drifting away from the light source, and it acts as the fallback that keeps the robot always doing something useful.
+
+**Phototaxis** is the next layer up. It only activates when the maximum light reading on either side exceeds a minimum threshold, meaning enough light is actually visible. When active, it steers the robot toward the brighter side using asymmetric wheel speeds. A small deadband threshold prevents the robot from turning when the difference between left and right is too small, this avoids oscillations caused by noise and keeps the robot going straight when the light is roughly centered, which is both smoother and faster than continuous micro-corrections.
+
+**Obstacle avoidance** takes priority over phototaxis and wandering. When proximity exceeds the threshold on one side, the robot turns away by reversing the opposite wheels. If both sides trigger simultaneously, an escape mode is activated: the robot picks a random spin direction and rotates in place until the front clears. The random choice prevents systematic failure in symmetric situations like corners. The escape logic is embedded inside the avoidance layer rather than being a separate one, as it is conceptually just a recovery strategy within the same behavior.
+
+**Halt** on black spot sits at the top with the highest priority and subsumes everything else. The ground sensors are read continuously, and if the minimum reading across all four sensors drops below a threshold, the robot stops. This makes the robot stop as soon as it touches the black spot.
+
+The overall step loop makes the subsumption structure explicit: each layer receives the current sensor readings and the command produced so far, and either passes it through unchanged or replaces it. This makes the priority stack easy to read and modify, where adding or reordering behaviors is just a matter of inserting or moving a layer call.
